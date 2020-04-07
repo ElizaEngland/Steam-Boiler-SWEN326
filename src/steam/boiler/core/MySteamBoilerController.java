@@ -74,17 +74,137 @@ public class MySteamBoilerController implements SteamBoilerController {
 			// Level and steam messages required, so emergency stop.
 			this.mode = State.EMERGENCY_STOP;
 		}
-		//
+		turnOnPumps(levelMessage, steamMessage);
+		// FIXME: this is where the main implementation stems from
 
+		if(this.mode == State.WAITING) {
+			Message[] waiting = extractAllMatches(MessageKind.STEAM_BOILER_WAITING, incoming);
+			if(waiting.length==0) {
+				System.out.println("Waiting...");
+			}
+			else {
+				System.out.println("Ready...");
+				this.mode=State.READY;
+			}
+		}
+		else if(this.mode == State.READY) {
+			System.out.println("Initializing...");
+			initializationMode(incoming,outgoing, steamMessage, levelMessage);
+		}
+		else if(this.mode == State.NORMAL) {
+			normalMode();
+		}
+		else if(this.mode == State.DEGRADED) {
+			degradedMode();
+		}
+		else if(this.mode == State.RESCUE) {
+			rescueMode();
+		}
+		else if(this.mode == State.EMERGENCY_STOP) {
+			emergencyStopMode();
+		}
+		else {
+			System.out.println("Error with state");
+		}
 
 
 		// NOTE: this is an example message send to illustrate the syntax
 		outgoing.send(new Message(MessageKind.MODE_m, Mailbox.Mode.INITIALISATION));
 	}
 
-	public void initializationMode(){
+	/*
+	 *The start mode for the pump
+	 */
+	public void initializationMode(Mailbox incoming, Mailbox outgoing, Message steam, Message water) {
+		double steamQuantity = steam.getDoubleParameter();
+		if(steamQuantity!=0) { // steam measuring device is defective
+			this.mode = State.EMERGENCY_STOP;
+			return;
+		}
+
+		double maxNormal = 	configuration.getMaximalNormalLevel();
+		double minNormal = 	configuration.getMinimalNormalLevel();
+		double waterLevel = water.getDoubleParameter();
+		System.out.println("WaterLevel: "+ waterLevel);
+		System.out.println("MinLevel: "+ minNormal);
+		System.out.println("MaxLevel: "+ maxNormal);
+		if(waterLevel < minNormal) {
+			// fill
+			outgoing.send(new Message(MessageKind.OPEN_PUMP_n, 0));
+			outgoing.send(new Message(MessageKind.OPEN_PUMP_n, 1));
+		}
+		else if(waterLevel > maxNormal) {
+			// empty
+			outgoing.send(new Message(MessageKind.VALVE));
+		}
+
+
+		if(waterLevel > (minNormal+30) && waterLevel < (maxNormal-30)) {
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n, 1));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n, 0));
+			outgoing.send(new Message(MessageKind.PROGRAM_READY));
+		}
+
+		// check for water level detection failure
+		Message[] waterLevelFailure = extractAllMatches(MessageKind.LEVEL_FAILURE_ACKNOWLEDGEMENT, incoming);
+		if(waterLevelFailure.length != 0) {
+			System.out.println("Water level detection failure acknowledged");
+			this.mode = State.EMERGENCY_STOP;
+			outgoing.send(new Message(MessageKind.MODE_m, Mailbox.Mode.EMERGENCY_STOP));
+		}
+
+		// check to see if ready
+		Message[] ready = extractAllMatches(MessageKind.PHYSICAL_UNITS_READY, incoming);
+		if(ready.length > 0) {
+			System.out.println("Physical units are ready. Entering normal mode....");
+			this.mode = State.NORMAL;
+			outgoing.send(new Message(MessageKind.MODE_m, Mailbox.Mode.NORMAL));
+		}
+
+		//if any physical units defective go to degradedMode()
+	}
+
+	public void normalMode() {
+
+		//if failure of water-level measuring unit got to rescueMode()
+		//if failure of any other physical units go to degradedMode()
+		// if water level risks reaching M1 or M2 go to emergencyStopMode()
+		//if transmissionFailure go to emergencyStopMode()
 
 	}
+
+	public void degradedMode() {
+		//if failure of water-level measuring unit got to rescueMode()
+		// if water level risks reaching M1 or M2 go to emergencyStopMode()
+		//if transmissionFailure go to emergencyStopMode()
+	}
+
+	public void rescueMode() {
+		// if water level risks reaching M1 or M2 go to emergencyStopMode()
+		//if transmissionFailure go to emergencyStopMode()
+
+	}
+
+	public void emergencyStopMode() {}
+
+	/**
+	 * Determine how many pumps to turn on
+	 */
+	public void turnOnPumps(Message water,Message steam){
+		double l = water.getDoubleParameter();
+		double s = steam.getDoubleParameter();
+		double w = configuration.getMaximualSteamRate();
+		double c;
+		double n;
+		for(int pumpNo = 0; pumpNo < 4; pumpNo++ ) {
+			n=pumpNo +1;
+			c = configuration.getPumpCapacity(pumpNo);
+			double lmax = l + (5*c*n) - (5*s);
+			double lmin = l + (5*c*n) - (5*w);
+			System.out.println("MAX: "+ lmax + " MIN: " +lmin);
+		}
+	}
+
 
 	/**
 	 * Check whether there was a transmission failure. This is indicated in several
