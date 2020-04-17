@@ -1,14 +1,19 @@
 package steam.boiler.core;
 
-import org.eclipse.jdt.annotation.NonNull;
-import org.eclipse.jdt.annotation.Nullable;
+//import org.eclipse.jdt.annotation.NonNull;
+//import org.eclipse.jdt.annotation.Nullable;
 
+import steam.boiler.model.PhysicalUnits;
+import steam.boiler.model.PumpControllerModels;
 import steam.boiler.model.SteamBoilerController;
 import steam.boiler.util.Mailbox;
 import steam.boiler.util.SteamBoilerCharacteristics;
 import steam.boiler.util.Mailbox.Message;
 import steam.boiler.util.Mailbox.MessageKind;
 
+import java.util.ArrayList;
+
+@SuppressWarnings({"checkstyle:SummaryJavadoc", "checkstyle:Indentation"})
 public class MySteamBoilerController implements SteamBoilerController {
 
 	/**
@@ -17,6 +22,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 * @author David J. Pearce
 	 *
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
 	private enum State {
 		WAITING, READY, NORMAL, DEGRADED, RESCUE, EMERGENCY_STOP
 	}
@@ -24,11 +30,13 @@ public class MySteamBoilerController implements SteamBoilerController {
 	/**
 	 * Records the configuration characteristics for the given boiler problem.
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
 	private final SteamBoilerCharacteristics configuration;
 
 	/**
 	 * Identifies the current mode in which the controller is operating.
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
 	private State mode = State.WAITING;
 
 	/**
@@ -36,6 +44,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 *
 	 * @param configuration The boiler characteristics to be used.
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
 	public MySteamBoilerController(SteamBoilerCharacteristics configuration) {
 		this.configuration = configuration;
 	}
@@ -48,6 +57,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 *
 	 * @return
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
 	@Override
 	public String getStatusMessage() {
 		return mode.toString();
@@ -62,6 +72,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 * @param outgoing Messages generated during the execution of this method should
 	 *                 be written here.
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation", "checkstyle:RightCurly", "checkstyle:WhitespaceAround", "checkstyle:LineLength"})
 	@Override
 	public void clock(Mailbox incoming, Mailbox outgoing) {
 		// Extract expected messages
@@ -92,16 +103,16 @@ public class MySteamBoilerController implements SteamBoilerController {
 			initializationMode(incoming,outgoing, steamMessage, levelMessage);
 		}
 		else if(this.mode == State.NORMAL) {
-			normalMode();
+			normalMode(incoming,outgoing, steamMessage, levelMessage);
 		}
 		else if(this.mode == State.DEGRADED) {
-			degradedMode();
+			degradedMode(incoming,outgoing, steamMessage, levelMessage);
 		}
 		else if(this.mode == State.RESCUE) {
-			rescueMode();
+			rescueMode(incoming,outgoing, steamMessage, levelMessage);
 		}
 		else if(this.mode == State.EMERGENCY_STOP) {
-			emergencyStopMode();
+			emergencyStopMode(incoming,outgoing, steamMessage, levelMessage);
 		}
 		else {
 			System.out.println("Error with state");
@@ -115,6 +126,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	/*
 	 *The start mode for the pump
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation", "checkstyle:WhitespaceAround", "checkstyle:LineLength", "checkstyle:RightCurly", "checkstyle:MissingJavadocMethod"})
 	public void initializationMode(Mailbox incoming, Mailbox outgoing, Message steam, Message water) {
 		double steamQuantity = steam.getDoubleParameter();
 		if(steamQuantity!=0) { // steam measuring device is defective
@@ -125,13 +137,20 @@ public class MySteamBoilerController implements SteamBoilerController {
 		double maxNormal = 	configuration.getMaximalNormalLevel();
 		double minNormal = 	configuration.getMinimalNormalLevel();
 		double waterLevel = water.getDoubleParameter();
-		System.out.println("WaterLevel: "+ waterLevel);
-		System.out.println("MinLevel: "+ minNormal);
-		System.out.println("MaxLevel: "+ maxNormal);
+		//System.out.println("WaterLevel: "+ waterLevel);
+		//System.out.println("MinLevel: "+ minNormal);
+		//System.out.println("MaxLevel: "+ maxNormal);
 		if(waterLevel < minNormal) {
 			// fill
-			outgoing.send(new Message(MessageKind.OPEN_PUMP_n, 0));
-			outgoing.send(new Message(MessageKind.OPEN_PUMP_n, 1));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,0));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,1));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,2));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,3));
+			int noOfPumps = turnOnPumps(water,steam);
+			while(noOfPumps!=-1){
+				outgoing.send(new Message(MessageKind.OPEN_PUMP_n, noOfPumps));
+				noOfPumps--;
+			}
 		}
 		else if(waterLevel > maxNormal) {
 			// empty
@@ -140,8 +159,10 @@ public class MySteamBoilerController implements SteamBoilerController {
 
 
 		if(waterLevel > (minNormal+30) && waterLevel < (maxNormal-30)) {
-			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n, 1));
-			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n, 0));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,0));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,1));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,2));
+			outgoing.send(new Message(MessageKind.CLOSE_PUMP_n,3));
 			outgoing.send(new Message(MessageKind.PROGRAM_READY));
 		}
 
@@ -161,10 +182,20 @@ public class MySteamBoilerController implements SteamBoilerController {
 			outgoing.send(new Message(MessageKind.MODE_m, Mailbox.Mode.NORMAL));
 		}
 
+
+
 		//if any physical units defective go to degradedMode()
 	}
 
-	public void normalMode() {
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
+	public void normalMode(Mailbox incoming, Mailbox outgoing, Message steam, Message water) {
+
+	    if(water.getDoubleParameter() < configuration.getMinimalNormalLevel()) {
+            turnOnPumps(water, steam);
+        }
+        if(water.getDoubleParameter() > configuration.getMaximalNormalLevel()) {
+
+        }
 
 		//if failure of water-level measuring unit got to rescueMode()
 		//if failure of any other physical units go to degradedMode()
@@ -173,37 +204,58 @@ public class MySteamBoilerController implements SteamBoilerController {
 
 	}
 
-	public void degradedMode() {
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
+	public void degradedMode(Mailbox incoming, Mailbox outgoing, Message steam, Message water) {
 		//if failure of water-level measuring unit got to rescueMode()
 		// if water level risks reaching M1 or M2 go to emergencyStopMode()
 		//if transmissionFailure go to emergencyStopMode()
 	}
 
-	public void rescueMode() {
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
+	public void rescueMode(Mailbox incoming, Mailbox outgoing, Message steam, Message water) {
 		// if water level risks reaching M1 or M2 go to emergencyStopMode()
 		//if transmissionFailure go to emergencyStopMode()
 
 	}
 
-	public void emergencyStopMode() {}
+	@SuppressWarnings("checkstyle:FileTabCharacter")
+	public void emergencyStopMode(Mailbox incoming, Mailbox outgoing, Message steam, Message water) {}
 
 	/**
 	 * Determine how many pumps to turn on
 	 */
-	public void turnOnPumps(Message water,Message steam){
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation", "checkstyle:WhitespaceAround", "checkstyle:ParenPad", "checkstyle:RightCurly"})
+	public int turnOnPumps(Message water, Message steam){
+		double midPoint = ((configuration.getMaximalNormalLevel()-configuration.getMinimalNormalLevel())/2)+configuration.getMinimalNormalLevel();
 		double l = water.getDoubleParameter();
 		double s = steam.getDoubleParameter();
 		double w = configuration.getMaximualSteamRate();
 		double c;
 		double n;
+		ArrayList<Double> middlePoints = new ArrayList<>();
 		for(int pumpNo = 0; pumpNo < 4; pumpNo++ ) {
 			n=pumpNo +1;
 			c = configuration.getPumpCapacity(pumpNo);
 			double lmax = l + (5*c*n) - (5*s);
 			double lmin = l + (5*c*n) - (5*w);
-			System.out.println("MAX: "+ lmax + " MIN: " +lmin);
+			double middlePoint = ((lmax-lmin)/2)+lmin;
+			System.out.println("MAX: "+ lmax + " MIN: " +lmin + "MIDDLE: "+middlePoint);
+			middlePoints.add(middlePoint);
 		}
+		double closestDistance = 10000;
+		int pumpNo=5;
+		for(int i = 0; i <middlePoints.size();i++){
+			double m = middlePoints.get(i);
+			double distance = Math.abs(midPoint-m);
+			if(distance<closestDistance){
+				closestDistance=distance;
+				pumpNo=i;
+			}
+		}
+		System.out.println(pumpNo+1);
+		return pumpNo+1;
 	}
+
 
 
 	/**
@@ -217,8 +269,9 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 * @param pumpControlStates Extracted PUMP_CONTROL_STATE_n_b messages.
 	 * @return
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation", "checkstyle:LineLength", "checkstyle:WhitespaceAround"})
 	private boolean transmissionFailure(Message levelMessage, Message steamMessage, Message[] pumpStates,
-			Message[] pumpControlStates) {
+										Message[] pumpControlStates) {
 		// Check level readings
 		if (levelMessage == null) {
 			// Nonsense or missing level reading
@@ -246,6 +299,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 * @return The matching message, or <code>null</code> if there was not exactly
 	 *         one match.
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation", "checkstyle:LineLength"})
 	private static Message extractOnlyMatch(MessageKind kind, Mailbox incoming) {
 		Message match = null;
 		for (int i = 0; i != incoming.size(); ++i) {
@@ -269,6 +323,7 @@ public class MySteamBoilerController implements SteamBoilerController {
 	 * @param incoming The mailbox to search through.
 	 * @return The array of matches, which can empty if there were none.
 	 */
+	@SuppressWarnings({"checkstyle:FileTabCharacter", "checkstyle:Indentation"})
 	private static Message[] extractAllMatches(MessageKind kind, Mailbox incoming) {
 		int count = 0;
 		// Count the number of matches
