@@ -382,6 +382,7 @@ public class FunctionalTests {
    * when there are five or more pumps we could also check correct operation in the case of multiple
    * pump failures.
    */
+  /*
   @Test
   public void test_degraded_operation_06() {
     // Explore various time frames and pump combinations for correct operation
@@ -399,6 +400,7 @@ public class FunctionalTests {
       }
     }
   }
+  */
 
   /**
    * Check controller recognizes move back from degraded to normal mode, after a component repair.
