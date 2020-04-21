@@ -312,6 +312,7 @@ public class FunctionalTests {
     // emergency stop to happen. Difference between min normal and min limit is 100L. Using both
     // pumps fully puts in 8L/s, whilst 10L/s is taken out in exhaust. Therefore, 2L/s drop in water
     // level and to lose 100L would take 50s.
+    System.out.println("NOW");
     clockForWithout(25, controller, model, atleast(MODE_emergencystop));
     // Now, break the pump by fixing it closed.
     model.setPump(0, new PumpModels.StuckClosed(0, 0, model));
@@ -382,7 +383,7 @@ public class FunctionalTests {
    * when there are five or more pumps we could also check correct operation in the case of multiple
    * pump failures.
    */
-  /*
+/*
   @Test
   public void test_degraded_operation_06() {
     // Explore various time frames and pump combinations for correct operation
@@ -400,7 +401,7 @@ public class FunctionalTests {
       }
     }
   }
-  */
+*/
 
   /**
    * Check controller recognizes move back from degraded to normal mode, after a component repair.
