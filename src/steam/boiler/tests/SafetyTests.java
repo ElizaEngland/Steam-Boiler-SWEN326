@@ -253,7 +253,6 @@ public class SafetyTests {
     clockForWithout(240, controller, model, atleast(MODE_emergencystop));
     // Under ideal conditions, should get here without problems. Now, we break the pump by forcing
     // it on and with an aggressive capacity.
-    System.out.println("YEET");
     model.setPump(0, new PumpModels.SticksOpen(0, 20, model));
     model.getPump(0).open(); // now is stuck open
     // At this point, we have to wait for the emergency stop event. This can take some time as the

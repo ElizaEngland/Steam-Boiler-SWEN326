@@ -240,6 +240,26 @@ public class TestUtils {
     // If we get here, then the given event obviously didn't happen so we're done.
   }
 
+  public static void clockForWith(int time, MySteamBoilerController controller, PhysicalUnits physicalUnits, MailboxMatcher matcher){
+    final int granularity = 100; // ms
+    int totalElapsed = 0; // ms
+    // Convert timeout into microseconds
+    time = time * 1000;
+    //
+    while (totalElapsed < time) {
+      Mailbox received = clock(granularity, totalElapsed, controller, physicalUnits);
+      if (received != null) {
+        // We received something back from controller, there see whether we have matched our event.
+        if (!matcher.matches(received)) {
+          // If we've matched this event, then that's bad news.
+          fail("bad event happened after " + totalElapsed + "ms (did not receive " + matcher + ", received " + received + ")");
+        }
+      }
+      totalElapsed += granularity;
+    }
+    // If we get here, then the given event obviously didn't happen so we're done.
+  }
+
   /**
    * Clock the combined system for a given amount of time. This sends and receives messages between
    * the two components when the total time elapsed is a multiple of five seconds. Messages received
