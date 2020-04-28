@@ -25,7 +25,6 @@ public class MySteamBoilerController implements SteamBoilerController {
      * Captures the various modes in which the controller can operate
      *
      * @author David J. Pearce
-     *
      */
     private enum State {
         WAITING, READY, NORMAL, DEGRADED, RESCUE, EMERGENCY_STOP
@@ -116,9 +115,7 @@ public class MySteamBoilerController implements SteamBoilerController {
         this.pumpStateMessages = extractAllMatches(MessageKind.PUMP_STATE_n_b, incoming1);
         this.pumpControlStateMessages = extractAllMatches(MessageKind.PUMP_CONTROL_STATE_n_b,
                 incoming1);
-        //
-        if (transmissionFailure(this.levelMessage, this.steamMessage, this.pumpStateMessages,
-                this.pumpControlStateMessages)) {
+        if (transmissionFailure(this.pumpStateMessages, this.pumpControlStateMessages)) {
             // Level and steam messages required, so emergency stop.
             this.mode = State.EMERGENCY_STOP;
         }
@@ -218,9 +215,7 @@ public class MySteamBoilerController implements SteamBoilerController {
      */
     public void normalMode() {
         this.brokenPumpNo = -1;
-
         if (howManyBrokenUnits()) {
-            System.out.println("YETTTETETETET");
             this.mode = State.EMERGENCY_STOP;
             this.outgoing.send(new Message(MessageKind.MODE_m, Mailbox.Mode.EMERGENCY_STOP));
             emergencyStopMode();
@@ -440,7 +435,11 @@ public class MySteamBoilerController implements SteamBoilerController {
     }
 
     /**
-     * Determine how many pumps to turn on
+     * Estimate how many pumps to turn on
+     *
+     * @param steam steam message for equation
+     * @param water water message for equation
+     * @return no of pumps to turn on
      */
     public int estimatePumps(double steam, double water) {
         if (this.levelMessage.getDoubleParameter() > this.configuration.getMaximalNormalLevel()) {
@@ -479,21 +478,21 @@ public class MySteamBoilerController implements SteamBoilerController {
     /**
      * Turns on number of pumps, turns off the rest of the pipes
      *
-     * @param no no of pumps to turn on
+     * @param numberofPumps no of pumps to turn on
      */
-    public void turnOnPumps(int no) {
+    public void turnOnPumps(int numberofPumps) {
         if (this.brokenPumpNo > -1) {
             if (stuck) {
-                no--;
+                numberofPumps--;
             }
-            if (no == this.configuration.getNumberOfPumps()) {
-                no--;
+            if (numberofPumps == this.configuration.getNumberOfPumps()) {
+                numberofPumps--;
             }
             this.outgoing.send(new Message(MessageKind.CLOSE_PUMP_n, this.brokenPumpNo));
             this.onOffPumps.set(this.brokenPumpNo, false);
         }
 
-        int count = no;
+        int count = numberofPumps;
         for (int i = 0; i < this.configuration.getNumberOfPumps(); i++) {
             if (count >= 0 && i != this.brokenPumpNo) { // open
                 this.outgoing.send(new Message(MessageKind.OPEN_PUMP_n, i));
@@ -646,14 +645,11 @@ public class MySteamBoilerController implements SteamBoilerController {
      * ways. Firstly, when one of the required messages is missing. Secondly, when
      * the values returned in the messages are nonsensical.
      *
-     * @param levelMessage      Extracted LEVEL_v message.
-     * @param steamMessage      Extracted STEAM_v message.
      * @param pumpStates        Extracted PUMP_STATE_n_b messages.
      * @param pumpControlStates Extracted PUMP_CONTROL_STATE_n_b messages.
-     * @return
+     * @return true or false if transmission failure
      */
-    private boolean transmissionFailure(Message lMessage, Message sMessage, Message[] pumpStates,
-                                        Message[] pumpControlStates) {
+    private boolean transmissionFailure(Message[] pumpStates, Message[] pumpControlStates) {
         // Check level readings
         boolean w = false;
         boolean s = false;
@@ -689,7 +685,7 @@ public class MySteamBoilerController implements SteamBoilerController {
      * @param kind     The kind of message to look for.
      * @param incoming The mailbox to search through.
      * @return The matching message, or <code>null</code> if there was not exactly
-     *         one match.
+     * one match.
      */
     private static @Nullable Message extractOnlyMatch(MessageKind kind, Mailbox incoming) {
         Message match = null;
