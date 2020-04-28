@@ -91,6 +91,7 @@ public class SafetyTests {
     SteamBoilerCharacteristics config = SteamBoilerCharacteristics.DEFAULT;
     // Check various time frames before transmission failure
     for (int t = 0; t != 120; ++t) {
+              
       MySteamBoilerController controller = new MySteamBoilerController(config);
       PhysicalUnits model = new PhysicalUnits.Template(config).construct();
       model.setMode(PhysicalUnits.Mode.WAITING);
